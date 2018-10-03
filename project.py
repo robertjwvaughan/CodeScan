@@ -198,12 +198,12 @@ def main():
 	for file in files:
 		img = cv2.imread("Images/" + file)
 		rotRect = scanImage(img)
-		#img, rotRect = straighten(img, rotRect)
+		# img, rotRect = straighten(img, rotRect)
 		img = drawBox(img, rotRect)
 		showImage(file, img)
 		
 	#for showing step by step
-	# img = cv2.imread("Images/" + "barcodediag.jpg")
+	# img = cv2.imread("Images/" + "ZintPortable.png")
 	# rotRect = scanImageStepByStep(img)
 	# img = drawBox(img, rotRect)
 	# showImage("img",img)
