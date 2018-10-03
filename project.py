@@ -189,18 +189,29 @@ def drawBox(img, rotRect):
 def showImage(title, image):
 	cv2.imshow(title, image)
 	cv2.waitKey(0)
+
+def intCheck(string):
+    try: 
+        int(string)
+        return True
+    except ValueError:
+        return False
 	
 def main():
 	#get list of files in the images folder
-	files = os.listdir("Images")
 	
-	#for each file, load it in, find the code, show the file
-	for file in files:
-		img = cv2.imread("Images/" + file)
-		rotRect = scanImage(img)
-		#img, rotRect = straighten(img, rotRect)
-		img = drawBox(img, rotRect)
-		showImage(file, img)
+	file = raw_input("Enter file name: ")
+	img = cv2.imread("Images/" + file)
+	img_choice = raw_input("Barcode (1) / QR (2): ")
+	if (intCheck(img_choice)):
+		if (int(img_choice) == 1):
+			rotRect = scanImage(img)
+			#img, rotRect = straighten(img, rotRect)
+			img = drawBox(img, rotRect)
+			showImage(file, img)
+		elif (int(img_choice) == 2):
+			print "Hello"
+
 		
 	#for showing step by step
 	# img = cv2.imread("Images/" + "barcodediag.jpg")
