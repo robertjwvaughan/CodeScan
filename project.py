@@ -16,7 +16,7 @@ def scanImage(img):
 	#which barcodes and qr codes are full of making it easier to differentiate
 	imgLap = cv2.Laplacian(imgGray, cv2.CV_32F)
 	
-	#using only absolute values to remove negatives
+	#using only absolute values to make negative values positive
 	imgAbs = np.absolute(imgLap)
 	
 	#converting to unsigned 8 bit integers so future functions can work with it(finding contours)
@@ -73,7 +73,7 @@ def scanImageStepByStep(img):
 	print(imgLap)
 	showImage("image", imgLap)
 	
-	#using only absolute values to remove negatives
+	#using only absolute values to make negative values positive
 	imgAbs = np.absolute(imgLap)
 	print(imgAbs)
 	showImage("image", imgAbs)
@@ -131,7 +131,7 @@ def scanImageStepByStep(img):
 def straighten(img, rotRect):
 	#concept here is kind of flawed with the rotation value given from minAreaRect()
 	#if the barcode is exactly perpendicular
-	#rotation will be 0 but it won't be the write orientation
+	#rotation will be 0 but it won't be the right orientation
 	#also the points given won't necessarily start at the barcodes top left
 	#if rotRect[2] == 0 and rotRect[1][0] < rotRect[1][1]:
 	#	rotRect = ((rotRect[0][0],rotRect[0][1]),(rotRect[1][0],rotRect[1][1]),90)
@@ -189,24 +189,150 @@ def drawBox(img, rotRect):
 def showImage(title, image):
 	cv2.imshow(title, image)
 	cv2.waitKey(0)
+
+def intCheck(string):
+    try: 
+        int(string)
+        return True
+    except ValueError:
+        return False
 	
-def main():
-	#get list of files in the images folder
-	files = os.listdir("Images")
-	
-	#for each file, load it in, find the code, show the file
-	for file in files:
-		img = cv2.imread("Images/" + file)
-		rotRect = scanImage(img)
-		# img, rotRect = straighten(img, rotRect)
-		img = drawBox(img, rotRect)
-		showImage(file, img)
+def decodeBarcode(img):
+		#UPC-A codes
+		sideGuard = '101'
+		midGuard = '01010'
+		left = ['0001101', '0011001', '0010011', '0111101', '0100011', '0110001', '0101111', '0111011', '0110111', '0001011']
+		right = ['1110010', '1100110', '1101100', '1000010', '1011100', '1001110', '1010000', '1000100', '1001000', '1110100']
 		
-	#for showing step by step
-	# img = cv2.imread("Images/" + "ZintPortable.png")
-	# rotRect = scanImageStepByStep(img)
-	# img = drawBox(img, rotRect)
-	# showImage("img",img)
+		#get dimensions
+		h, w, c = np.shape(img)
+		
+		#convert to grey and threshold it
+		img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+		_, img = cv2.threshold(img, 128, 255, cv2.THRESH_BINARY)
+
+		#closing image to clean up the barcode, remove numbers so they don't interfere with decoding
+		structEl = cv2.getStructuringElement(cv2.MORPH_RECT, (1,h ))
+		img = cv2.morphologyEx(img, cv2.MORPH_CLOSE  , structEl)
+		
+		#calculate the exact boundaries/characteristics of the barcode for decoding		
+		startX, endX, startY, endY, barWidth = findBounds(img, h, w)
+		
+		binaryCode = ''
+		
+		#iterator over the barcode using above variables
+		for column in range(startX, endX, barWidth):
+			#select bar
+			line = img[startY: endY, column:column+barWidth]
+			
+			#find the avg value for the pixels in the selected bar
+			avg = np.mean(line)
+			
+			#if in the upper half of values binary 0, else binary 1
+			if avg > int((255/2)):
+				binaryCode += '0'
+			else:
+				binaryCode += '1'
+		
+		print("CODE(" + str(len(binaryCode)) + "): " + binaryCode)
+
+		#checking if guard bars are in the correct place, otherwise don't bother checking the rest
+		#only works for perfectly aligned and read.
+		if binaryCode[0:3] == sideGuard:
+			print("match left side guard")
+		
+			if binaryCode[45:50] == midGuard:
+				print("match mid guard")
+		
+				if binaryCode[92:95] == sideGuard:
+					print("match right side guard")
+				else:
+					print("No match")
+					return
+			else:
+				print("No match")
+				return
+		else:
+			print("No match")
+			return
+		
+		#if the guard bars are in the correct location then the following should split the left and right side 
+		#exactly for decodoing
+		leftSide = binaryCode[3:45]
+		rightSide = binaryCode[50:92]
+		
+		finalCode = ''
+		
+		#convert the left side binary to the numbers they represent
+		#seven sections per number, so iterate by 7
+		for section in range(0,len(leftSide)+1, 7):
+			for lCode in left:
+				if leftSide[section:section+7] == lCode:
+					finalCode += str(left.index(lCode))
+					break
+					
+		#convert the right side binary to the numbers they represent
+		for section in range(0,len(rightSide)+1, 7):
+			for rCode in right:
+				if rightSide[section:section+7] == rCode:
+					finalCode += str(right.index(rCode))
+					break
+					
+		#hardcoded value for perf.jpg for quickly checking match
+		if finalCode == '705632085943':
+			print("CODE MATCHES")
+		
+		print(finalCode)
+			
+		showImage("decoding", img)
+
+def findBounds(img, h , w):
+	startX = 0 
+	endX = 0
+	startY = 0 
+	endY = 0
+	barWidth = 1
+
+	#iterating over columns finding mean values until it find one that is on avg black
+	for x in range(0,w):
+		#cut the image
+		column = img[0:h,x:x+1]
+		
+		#if the mean is below 128 assume black, mark as start, and start recording the width of bars
+		if np.mean(column) < 128:
+			startX = x
+			
+			#keep iterating from the start counting how wide the bar is
+			for x2 in range(x,w):
+				column2 = img[0:h,x2+1]
+
+				#once it goes back to white on avg break, stop counting bar width
+				if np.mean(column2) > 128:
+					break
+				else:
+					barWidth +=1
+			break
+			
+	#startX, endX, startY, endY, barWidth 
+	return startX, 831, 0, 488, barWidth
+
+def main():
+	#just hardcoding manually aligned image until we get it to auto align for decoding
+	# decodeBarcode(cv2.imread("Images/perf.jpg"))
+	# return
+	
+	file = raw_input("Enter file name: ")
+	img = cv2.imread("Images/" + file)
+	img_choice = raw_input("Barcode (1) / QR (2): ")
+	if (intCheck(img_choice)):
+		if (int(img_choice) == 1):
+			rotRect = scanImageStepByStep(img)
+			#img, rotRect = straighten(img, rotRect)
+			img = drawBox(img, rotRect)
+			showImage(file, img)
+			
+		elif (int(img_choice) == 2):
+			print "Hello"
 
 if __name__ == "__main__":
     main()
