@@ -326,7 +326,7 @@ def main():
 	img_choice = raw_input("Barcode (1) / QR (2): ")
 	if (intCheck(img_choice)):
 		if (int(img_choice) == 1):
-			rotRect = scanImageStepByStep(img)
+			rotRect = scanImage(img)
 			#img, rotRect = straighten(img, rotRect)
 			img = drawBox(img, rotRect)
 			showImage(file, img)
