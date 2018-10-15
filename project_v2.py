@@ -21,30 +21,41 @@ def qrCodeRead(img):
     imgAbsol = np.absolute(imgLap)
      
     imgInt = np.uint8(imgAbsol)
-    
+
     avg_thresh = np.mean(imgInt) + np.std(imgInt)
  
     _, binaryImg = cv2.threshold(imgInt, thresh = avg_thresh, maxval = 255, type = cv2.THRESH_BINARY)
 
-    structEl = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    structEl = cv2.getStructuringElement(cv2.MORPH_RECT, (10, 10))
 
     closing = cv2.morphologyEx(binaryImg, cv2.MORPH_CLOSE, structEl)
-    opening = cv2.morphologyEx(closing, cv2.MORPH_OPEN, structEl)
+
+    dilate = cv2.dilate(closing, structEl, iterations = 3)
+    erode = cv2.erode(dilate, structEl, iterations = 4)
+
+    opening = cv2.morphologyEx(erode, cv2.MORPH_OPEN, structEl)
  
-    boundary = cv2.morphologyEx(opening,cv2.MORPH_GRADIENT,structEl)
+    boundary = cv2.morphologyEx(erode,cv2.MORPH_GRADIENT,structEl)
  
     _, contours, _ = cv2.findContours(boundary,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
  
     cv2.drawContours(image_gray, contours, -1, 255, 3)
 
     c = max(contours, key = cv2.contourArea)
-    print(contours)
+    # print(contours)
  
     x, y, width, height = cv2.boundingRect(c)
+
+    print (str(width) + " " + str(height))
+
+    # if width >= (height - 5) or width <= (height + 5):
+    #     print("QR")
  
+    cv2.rectangle(image_gray,(x, y),(x + width, y + height), (0,255,0), 2)
+    
     crop_img = img[y:y + height, x:x + width]
  
-    cv2.imshow("Gray", crop_img)
+    cv2.imshow("Gray", image_gray)
     cv2.waitKey(0)
 	
 def decodeBarcode(img):	
@@ -54,6 +65,53 @@ def decodeBarcode(img):
 	#convert to grey and threshold it
 	img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 	_, img = cv2.threshold(img, 128, 255, cv2.THRESH_BINARY)
+
+    ###MO
+
+    # convert the image to grayscale and flip the foreground
+    # and background to ensure foreground is now "white" and
+    # the background is "black
+    # gray = cv2.bitwise_not(img)
+    
+    # # threshold the image, setting all foreground pixels to
+    # # 255 and all background pixels to 0
+    # thresh = cv2.threshold(gray, 0, 255,
+    #     cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+
+    # # Taking coords of every pixel that are > 0
+    # # minAreaRect will determine the angle needed to align everything
+    # coords = np.column_stack(np.where(thresh > 0))
+    # angle = cv2.minAreaRect(coords)[-1]
+    
+    # # the `cv2.minAreaRect` function returns values in the
+    # # range [-90, 0); as the rectangle rotates clockwise the
+    # # returned angle trends to 0 -- in this special case we
+    # # need to add 90 degrees to the angle
+    # if angle < -45:
+    #     angle = -(90 + angle)
+    
+    # # otherwise, just take the inverse of the angle to make
+    # # it positive
+    # else:
+    #     angle = -angle
+
+    # # rotate the image to deskew it
+    # (h, w) = img.shape[:2]
+    # center = (w // 2, h // 2)
+    # M = cv2.getRotationMatrix2D(center, angle, 1.0)
+    # rotated = cv2.warpAffine(img, M, (w, h),
+    #     flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+    # # draw the correction angle on the image so we can validate it
+    # cv2.putText(rotated, "Angle: {:.2f} degrees".format(angle),
+    #     (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+    
+    # # show the output image
+    # print("[INFO] angle: {:.3f}".format(angle))
+    # cv2.imshow("Input", img)
+    # cv2.imshow("Rotated", rotated)
+    # cv2.waitKey(0)
+
+    ###MO
 
 	#closing image to clean up the barcode, remove numbers so they don't interfere with decoding
 	structEl = cv2.getStructuringElement(cv2.MORPH_RECT, (1,h/2 ))

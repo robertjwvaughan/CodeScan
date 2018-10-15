@@ -181,11 +181,13 @@ def qrCodeRead(img):
     cv2.drawContours(image_gray, contours, -1, 255, 3)
 
     c = max(contours, key = cv2.contourArea)
-    print(contours)
+    # print(contours)
  
     x, y, width, height = cv2.boundingRect(c)
  
     crop_img = img[y:y + height, x:x + width]
+
+    print (width + " " + height)
  
     #cv2.rectangle(img,(x, y),(x + width, y + height), (0,255,0), 2)
  
@@ -196,7 +198,8 @@ def main():
     #get list of files in the images folder
      
     file = raw_input("Enter file name: ")
-    img = cv2.imread("Images/" + "images (1).jpg")
+    file = "ZintPortable.png"
+    img = cv2.imread("Images/" + file)
     img_choice = raw_input("Barcode (1) / QR (2): ")
     if (intCheck(img_choice)):
         if (int(img_choice) == 1):
