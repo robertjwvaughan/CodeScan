@@ -2,145 +2,8 @@ import numpy as np
 import cv2
 import os
 import math
+import easygui
 from matplotlib import pyplot as plt
- 
-#How it works
-#using gradients, blurs, threshold and morphology, making the desired object(barcode/qr code)
-#the biggest white object in the image, so findContours can locate it easily
-#this will only work if the barcode is the biggest collection of edges in the image
- 
-def scanImage(img):
-    #convert image to grayscale to reduce image complexity
-    imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-     
-    #using laplacian operator to accentuate edges, 
-    #which barcodes and qr codes are full of making it easier to differentiate
-    imgLap = cv2.Laplacian(imgGray, cv2.CV_32F)
-     
-    #using only absolute values to remove negatives
-    imgAbs = np.absolute(imgLap)
-     
-    #converting to unsigned 8 bit integers so future functions can work with it(finding contours)
-    imgAbsInt = np.uint8(imgAbs)
-     
-    #blur the image so the barcode/qr cide area will be a sort of blob, making it easier to threshold
-    imgBlur = cv2.blur(imgAbsInt, (5,5))
-     
-    #calculating threshold to use based on the average of the image and its standard deviation
-    threshold = np.mean(imgBlur) + np.std(imgBlur)
-     
-    #apply a binary threshold on the image
-    _, imgThresh = cv2.threshold(imgBlur, threshold, 255, cv2.THRESH_BINARY)
-     
-    #get a rectangular structuring element to use in the following morphological function
-    structEl = cv2.getStructuringElement(cv2.MORPH_RECT, (20, 20))
-    
-    #closing image to remove the small gaps in the barcode/qr code
-    imgClose = cv2.morphologyEx(imgThresh, cv2.MORPH_CLOSE, structEl)
-     
-    #at this point barcode/qr code should be the biggest contour in the image
-    #find extreme outer contours(RETR_EXTERNAL), and only return the required edges to get the shape(CHAIN_APPROX_SIMPLE_)
-    _, contours, _ = cv2.findContours(imgClose, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-     
-    #finding the largest contour
-    largestArea = 0
-    largestContour = None
-     
-    for contour in contours:
-        area = cv2.contourArea(contour)
-        if  area > largestArea:
-            largestArea = area
-            largestContour = contour
-     
-    #find the smallest rectangle that will encompass all of the largest contour
-    rotRect = cv2.minAreaRect(largestContour)
-     
-    #the centre, w/h, rot in rotRect
-    return rotRect
- 
-#same as above function but shows and prints images at every step
-def scanImageStepByStep(img):
-    print(img)
-    showImage("image", img)
-     
-    #convert image to grayscale to reduce image complexity
-    imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    print(imgGray)
-    showImage("image", imgGray)
-     
-    #using laplacian operator to accentuate edges, 
-    #which barcodes and qr codes are full of making it easier to differentiate
-    imgLap = cv2.Laplacian(imgGray, cv2.CV_32F)
-    print(imgLap)
-    showImage("image", imgLap)
-     
-    #using only absolute values to remove negatives
-    imgAbs = np.absolute(imgLap)
-    print(imgAbs)
-    showImage("image", imgAbs)
-     
-    #converting to unsigned 8 bit integers so future functions can work with it(finding contours)
-    imgAbsInt = np.uint8(imgAbs)
-    print(imgAbsInt)
-    showImage("image", imgAbsInt)
-     
-    #blur the image so the barcode/qr cide area will be a sort of blob, making it easier to threshold
-    imgBlur = cv2.blur(imgAbsInt, (5,5))
-    print(imgBlur)
-    showImage("image", imgBlur)
-     
-    #calculating threshold to use based on the average of the image and its standard deviation
-    threshold = np.mean(imgBlur) + np.std(imgBlur)
-    print("Threshold: " + str(threshold))
-     
-    #apply a binary threshold on the image
-    _, imgThresh = cv2.threshold(imgBlur, threshold, 255, cv2.THRESH_BINARY)
-    print(imgThresh)
-    showImage("image",imgThresh)
-     
-    #get a rectangular structuring element to use in the following morphological function
-    structEl = cv2.getStructuringElement(cv2.MORPH_RECT, (20, 20))
-    print("Structuring Element: " + str(structEl))
-     
-    #closing image to remove the small gaps in the barcode
-    imgClose = cv2.morphologyEx(imgThresh, cv2.MORPH_CLOSE, structEl)
-    print(imgClose)
-    showImage("image", imgClose)
-     
-    #at this point barcode/qr code should be the biggest contour in the image
-    #find extreme outer contours(RETR_EXTERNAL), and only return the required edges to get the shape(CHAIN_APPROX_SIMPLE_)
-    _, contours, _ = cv2.findContours(imgClose, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-     
-    #finding the largest contour
-    largestArea = 0
-    largestContour = None
-     
-    for contour in contours:
-        area = cv2.contourArea(contour)
-        if  area > largestArea:
-            largestArea = area
-            largestContour = contour
-     
-    #find the smallest rectangle that will encompass all of the largest contour
-    rotRect = cv2.minAreaRect(largestContour)
-    print(rotRect)
-     
-    #return the image with box drawn
-    return rotRect
- 
-def drawBox(img, rotRect):
-    print(rotRect)
-    #convert the values(point, size, rotation) to points that can be 
-    #used in the drawContours function
-    points = [cv2.boxPoints(rotRect).astype(int)]
-    #draw contours
-    cv2.drawContours(img,points,-1,(0,0,255),1)
-    return img
-     
-#shows image and hold window open
-def showImage(title, image):
-    cv2.imshow(title, image)
-    cv2.waitKey(0)
  
 def intCheck(string):
     try: 
@@ -148,73 +11,333 @@ def intCheck(string):
         return True
     except ValueError:
         return False
- 
-def qrCodeRead(img):
-    #Graying the image
- 
-    image_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
- 
-    # Smooths the image (for poorer quality images)
-    # gaussian_img = cv2.GaussianBlur(image_gray,(5,5),0)
- 
-    # Defines edges more
-    imgLap = cv2.Laplacian(image_gray, cv2.CV_32F)
-     
-    # Removing negative values
-    imgAbsol = np.absolute(imgLap)
-     
-    imgInt = np.uint8(imgAbsol)
-    
-    avg_thresh = np.mean(imgInt) + np.std(imgInt)
- 
-    _, binaryImg = cv2.threshold(imgInt, thresh = avg_thresh, maxval = 255, type = cv2.THRESH_BINARY)
+		
+def nearestOddInteger(val):
+	return int(np.ceil(np.std(val)) // 2 * 2 + 1)
+	
+def barcodeCheck(img):
+	height, width, _ = np.shape(img)
 
-    structEl = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+	print ("Hi: " + str(width) + " " + str(height))
 
-    closing = cv2.morphologyEx(binaryImg, cv2.MORPH_CLOSE, structEl)
-    opening = cv2.morphologyEx(closing, cv2.MORPH_OPEN, structEl)
- 
-    boundary = cv2.morphologyEx(opening,cv2.MORPH_GRADIENT,structEl)
- 
-    _, contours, _ = cv2.findContours(boundary,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
- 
-    cv2.drawContours(image_gray, contours, -1, 255, 3)
+	if width >= (height - 5) or width <= (height + 5):
+		return True
+	else:
+		return False
 
-    c = max(contours, key = cv2.contourArea)
-    # print(contours)
- 
-    x, y, width, height = cv2.boundingRect(c)
- 
-    crop_img = img[y:y + height, x:x + width]
+def qrCodeRead(img): 
+	image_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+	h, w, c = np.shape(img)
+	print(np.shape(img))
+	
+	blurK = (5,5)
+	# blurKh = int(round(h*0.02))
+	# blurKw = int(round(w*0.02))
+	
+	# if blurKh % 2 == 0:
+		# blurKh +=1
+		
+	# if blurKw % 2 == 0:
+		# blurKw +=1
+		
+	# blurK = (blurKh, blurKw)
 
-    print (width + " " + height)
+	print(blurK)
+	image_gray = cv2.GaussianBlur(image_gray, blurK, 0)
+	showImage("blur", image_gray)
+
+	canny = cv2.Canny(image_gray, threshold1=255-nearestOddInteger(image_gray), threshold2=255)
+
+	showImage("canny", canny)
+	_, binary_img = cv2.threshold(canny,127,255,cv2.THRESH_BINARY)
+	
+	showImage("bin", binary_img)
+	
+	structK = (4,4)
+	
+	# structK = (int(blurK[0]*1.1), int(blurK[1]*1.1))
+	structEl = cv2.getStructuringElement(cv2.MORPH_RECT, structK)
+
+	dilation = cv2.dilate(binary_img, structEl, iterations = 3)
+	
+	showImage("dilate", dilation)
  
-    #cv2.rectangle(img,(x, y),(x + width, y + height), (0,255,0), 2)
+	boundary = cv2.morphologyEx(dilation,cv2.MORPH_GRADIENT,structEl)
  
-    cv2.imshow("Gray", crop_img)
-    cv2.waitKey(0)
+	_, contours, _ = cv2.findContours(boundary,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
  
+	cv2.drawContours(image_gray, contours, -1, 255, 3)
+
+	c = max(contours, key = cv2.contourArea)
+ 
+	x, y, width, height = cv2.boundingRect(c)
+	rotRect = cv2.minAreaRect(c)
+
+
+	print (str(width) + " " + str(height))
+
+	if width >= (height - 5) or width <= (height + 5):
+		print("QR")
+
+	cv2.rectangle(img,(x, y),(x + width, y + height), (0,255,0), 2)
+	
+	crop_img = img[y:y + height, x:x + width]
+	
+	showImage("cropped", crop_img)
+ 
+	return crop_img, rotRect
+		
+def decodeBarcode(img):	
+	#get dimensions
+	h, w, c = np.shape(img)
+	
+	#convert to grey and threshold it
+	img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+	_, img = cv2.threshold(img, 128, 255, cv2.THRESH_BINARY)
+	showImage("img before", img)
+	#closing image to clean up the barcode, remove numbers so they don't interfere with decoding
+	structEl = cv2.getStructuringElement(cv2.MORPH_RECT, (1, h/4))
+	morphed = cv2.morphologyEx(img, cv2.MORPH_CLOSE, structEl)
+	
+	if np.mean(morphed) > 240:
+		print(np.mean(morphed))
+		structEl = cv2.getStructuringElement(cv2.MORPH_RECT, (w/4, 1))
+		morphed = cv2.morphologyEx(img, cv2.MORPH_CLOSE, structEl)
+		
+	showImage("img after", morphed)
+	
+	
+	#get the binary code for each section of the barcode
+	#black bar 1 white bar 0
+	binaryCode = getBinary(morphed, h, w)
+	
+
+	#convert the binary code found in to the acutal barcode numbers
+	finalCode = convertBinary(binaryCode)
+
+	if finalCode is not None:		
+		#display code found
+		print("CODE: " + finalCode)
+	else:
+		print("Error code not read correctly")
+		
+
+def findBounds(img, h , w):
+	startX = 0 
+	endX = 0
+	startY = 0 
+	endY = 0
+	barWidth = 1
+	
+	#calc startx and barWidth
+	#iterating over columns finding mean values until it find one that is on avg black
+	for x in range(0,w):
+		#cut the image in single pixel wide, full height bars, across the image
+		column = img[0:h,x:x+1]
+			
+		#if the mean is below 128 assume black, mark as start, and start recording the width of bars
+		if np.mean(column) < 230:
+			startX = x
+			
+			#keep iterating from the start counting how wide the bar is
+			for x2 in range(x,w):
+				column2 = img[0:h,x2+1]
+
+				#once it goes back to white on avg break, stop counting bar width
+				if np.mean(column2) > 230:
+					break
+				else:
+					barWidth +=1
+			break
+		
+	#calc endX, working backwwards from width to 0 finding where the end of the barcode is
+	for x in range(w-1, 0, -1):
+		column = img[0:h, x:x+1]
+		
+		#when found save it and break
+		if np.mean(column) < 230:
+			endX = x
+			break
+			
+	#calc start y
+	for y in range(0, h):
+		row = img[y:y+1, startX:endX]
+		
+		if np.mean(row) < 175:
+			startY = y
+			break;
+			
+	#calc end y
+	for y in range(h-1, 0, -1):
+		row = img[y:y+1,startX:endX]
+	
+		if np.mean(row) < 175:
+			endY = y
+			break;
+			
+
+	c = (((endX-startX)/2,(endY-startY)/2))
+
+	#if not oriented correctly rotate 90 degress
+	if endX - startX < endY - startY:
+		#crop the found area
+		crop_img = img[startY:endY, startX:endX]
+		h, w = np.shape(crop_img)
+		
+		#create new white image to fit the cropped image so rotating doesn't lose quality
+		wh = int(math.hypot(w, -h))
+		newImg = np.zeros((wh,wh), np.uint8)
+		newImg.fill(255)
+		
+		x1 = (wh-w)/2
+		y1 = (wh-h)/2
+		
+		newImg[y1:y1+h, x1:x1+w] = crop_img
+		
+		c = (wh/2,wh/2)
+		
+		#rotate
+		rotMx = cv2.getRotationMatrix2D(c, 90, 1)
+		rotImg = cv2.warpAffine(newImg, rotMx, (wh,wh), borderValue = (255,255,255))
+
+		#find bounds in new image and overwrite previous bounds
+		h,w = np.shape(rotImg)
+		startX, endX, startY, endY, barWidth, img = findBounds(rotImg, h , w)
+			
+	print(startX, endX, startY, endY, barWidth)
+	showImage("bounds", img)
+	return startX, endX, startY, endY, barWidth, img
+	
+def getBinary(img, h, w):
+	#calculate the exact boundaries/characteristics of the barcode for decoding		
+	startX, endX, startY, endY, barWidth, img = findBounds(img, h, w)
+
+	binaryCode = ''
+	
+	#iterator over the barcode using above variables
+	for column in range(startX, endX, barWidth):
+		#select bar
+		line = img[startY: endY, column:column+barWidth]
+		
+		#find the avg value for the pixels in the selected bar
+		avg = np.mean(line)
+		
+		#if in the upper half of values binary 0, else binary 1
+		if avg > int((255/2)):
+			binaryCode += '0'
+		else:
+			binaryCode += '1'
+			
+	return binaryCode
+	
+def convertBinary(binaryCode):
+	#UPC-A codes
+	left = ['0001101', '0011001', '0010011', '0111101', '0100011', '0110001', '0101111', '0111011', '0110111', '0001011']
+	right = ['1110010', '1100110', '1101100', '1000010', '1011100', '1001110', '1010000', '1000100', '1001000', '1110100']
+
+	
+	if errorCheck(binaryCode) is not True:
+		print("Return")
+		return
+		
+	#if the guard bars are in the correct location then the following should split the left and right side 
+	#exactly for decodoing
+	leftSide = binaryCode[3:45]
+	rightSide = binaryCode[50:92]
+	
+	finalLeft = convertSide(leftSide, left)
+	finalRight = convertSide(rightSide, right)
+	
+	if finalLeft == '' or finalRight == '':
+		rightSide, leftSide = leftSide[::-1], rightSide[::-1]
+		
+		finalLeft = convertSide(leftSide, left)
+		finalRight = convertSide(rightSide, right)
+		
+	finalCode = finalLeft + finalRight
+	return finalCode
+	
+#converts a side of the barcode from binary to decimal using provided list
+def convertSide(side, bin):
+	final = ''
+	
+	for section in range(0,len(side)+1, 7):
+		for code in bin:
+			if side[section:section+7] == code:
+				final += str(bin.index(code))
+				break
+
+	return final
+
+#checks guard bars are in the correct place and code is correct length
+def errorCheck(binaryCode):
+	sideGuard = '101'
+	midGuard = '01010'
+
+	print(len(binaryCode), binaryCode)
+	if len(binaryCode) != 95:
+			print("incorrect length found")
+			return False
+			
+	#checking if guard bars are in the correct place, otherwise don't bother checking the rest
+	#only works for perfectly aligned and read.
+	if binaryCode[0:3] == sideGuard:
+		print("match left side guard")
+	
+		if binaryCode[45:50] == midGuard:
+			print("match mid guard")
+	
+			if binaryCode[92:95] == sideGuard:
+				print("match right side guard")
+			else:
+				print("No match")
+				return False
+		else:
+			print("No match")
+			return False
+	else:
+		print("No match")
+		return False
+			
+	return True
+ 
+#shows image and hold window open
+def showImage(title, image):
+	cv2.imshow(title, image)
+	cv2.waitKey(0)
+	
+#aligns the image based on the rotation in the provided rotated rectangle
+def align(crop_img, rotRect):
+	h, w, c = np.shape(crop_img)
+
+	#create new white image for aligning
+	wh = int(math.hypot(w, -h))
+	newImg = np.zeros((wh, wh, c), np.uint8)
+	newImg.fill(255)
+	
+
+	x1 = (wh-w)/2
+	y1 = (wh-h)/2
+
+	# put orig inside new img
+	newImg[y1:y1+h, x1:x1+w] = crop_img
+
+	# get centre
+	c = (wh/2,wh/2)
+
+	#rotate
+	rotMx = cv2.getRotationMatrix2D(c, rotRect[2], 1)
+	rotImg = cv2.warpAffine(newImg, rotMx, (wh,wh), borderValue = (255,255,255))
+
+	return rotImg
+
 def main():
-    #get list of files in the images folder
-     
-    file = raw_input("Enter file name: ")
-    file = "ZintPortable.png"
-    img = cv2.imread("Images/" + file)
-    img_choice = raw_input("Barcode (1) / QR (2): ")
-    if (intCheck(img_choice)):
-        if (int(img_choice) == 1):
-            rotRect = scanImage(img)
-            #img, rotRect = straighten(img, rotRect)
-            img = drawBox(img, rotRect)
-            showImage(file, img)
-        elif (int(img_choice) == 2):
-            qrCodeRead(img)
-         
-    #for showing step by step
-    # img = cv2.imread("Images/" + "barcodediag.jpg")
-    # rotRect = scanImageStepByStep(img)
-    # img = drawBox(img, rotRect)
-    # showImage("img",img)
- 
+	filename = easygui.fileopenbox()
+	img = cv2.imread(filename)
+	img, rotRect = qrCodeRead(img)
+	aligned = align(img, rotRect)
+	decodeBarcode(aligned)
+
+
 if __name__ == "__main__":
     main()
