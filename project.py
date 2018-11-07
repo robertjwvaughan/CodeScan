@@ -18,27 +18,27 @@ def nearestOddInteger(val):
 def barcodeCheck(img):
 	height, width, _ = np.shape(img)
 
-	print ("Hi: " + str(width) + " " + str(height))
-
-	if width >= (height - 5) or width <= (height + 5):
+	if width > (height + 5) or width < (height - 5):
+		print("Barcode: " + str(width) + " " + str(height))
 		return True
 	else:
+		print("QR: " + str(width) + " " + str(height))
 		return False
 
 def qrCodeRead(img): 
 	image_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-	h, w, c = np.shape(img)
+	height, width, _ = np.shape(img)
 	print(np.shape(img))
 	
 	blurK = (5,5)
-	# blurKh = int(round(h*0.02))
-	# blurKw = int(round(w*0.02))
+	# blurKh = int(round(height*0.02))
+	# blurKw = int(round(width*0.02))
 	
 	# if blurKh % 2 == 0:
-		# blurKh +=1
+	# 	blurKh +=1
 		
 	# if blurKw % 2 == 0:
-		# blurKw +=1
+	# 	blurKw +=1
 		
 	# blurK = (blurKh, blurKw)
 
@@ -72,12 +72,6 @@ def qrCodeRead(img):
  
 	x, y, width, height = cv2.boundingRect(c)
 	rotRect = cv2.minAreaRect(c)
-
-
-	print (str(width) + " " + str(height))
-
-	if width >= (height - 5) or width <= (height + 5):
-		print("QR")
 
 	cv2.rectangle(img,(x, y),(x + width, y + height), (0,255,0), 2)
 	
@@ -311,7 +305,7 @@ def align(crop_img, rotRect):
 	h, w, c = np.shape(crop_img)
 
 	#create new white image for aligning
-	wh = int(math.hypot(w, -h))
+	wh = int(math.hypot(w, - h))
 	newImg = np.zeros((wh, wh, c), np.uint8)
 	newImg.fill(255)
 	
@@ -334,9 +328,12 @@ def align(crop_img, rotRect):
 def main():
 	filename = easygui.fileopenbox()
 	img = cv2.imread(filename)
+
 	img, rotRect = qrCodeRead(img)
-	aligned = align(img, rotRect)
-	decodeBarcode(aligned)
+
+	if barcodeCheck(img):
+		aligned = align(img, rotRect)
+		decodeBarcode(aligned)
 
 
 if __name__ == "__main__":
