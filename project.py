@@ -30,20 +30,10 @@ def qrCodeRead(img):
 	height, width, _ = np.shape(img)
 	print(np.shape(img))
 	
-	blurK = (5,5)
-	# blurKh = int(round(height*0.02))
-	# blurKw = int(round(width*0.02))
-	
-	# if blurKh % 2 == 0:
-	# 	blurKh +=1
-		
-	# if blurKw % 2 == 0:
-	# 	blurKw +=1
-		
-	# blurK = (blurKh, blurKw)
+	blur_k = (5,5)
 
-	print(blurK)
-	image_gray = cv2.GaussianBlur(image_gray, blurK, 0)
+	print(blur_k)
+	image_gray = cv2.GaussianBlur(image_gray, blur_k, 0)
 	showImage("blur", image_gray)
 
 	canny = cv2.Canny(image_gray, threshold1=255-nearestOddInteger(image_gray), threshold2=255)
@@ -53,15 +43,18 @@ def qrCodeRead(img):
 	
 	showImage("bin", binary_img)
 	
-	structK = (4,4)
-	
-	# structK = (int(blurK[0]*1.1), int(blurK[1]*1.1))
-	structEl = cv2.getStructuringElement(cv2.MORPH_RECT, structK)
+	structK = (4, 4)
 
-	dilation = cv2.dilate(binary_img, structEl, iterations = 3)
+	merge = int((math.sqrt(width * height)) * .02)
+	print(merge)
+	structEl = cv2.getStructuringElement(cv2.MORPH_RECT, (merge,merge))
+
+	dilation = cv2.dilate(binary_img, structEl, iterations = 1)
 	
 	showImage("dilate", dilation)
- 
+
+	structK = (4,4)
+	structEl = cv2.getStructuringElement(cv2.MORPH_RECT, structK)
 	boundary = cv2.morphologyEx(dilation,cv2.MORPH_GRADIENT,structEl)
  
 	_, contours, _ = cv2.findContours(boundary,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
