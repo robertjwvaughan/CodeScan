@@ -31,8 +31,8 @@ def qrCodeRead(img):
 	print(np.shape(img))
 	
 	blur_k = (5,5)
-
 	print(blur_k)
+
 	image_gray = cv2.GaussianBlur(image_gray, blur_k, 0)
 	showImage("blur", image_gray)
 
@@ -49,7 +49,7 @@ def qrCodeRead(img):
 	print(merge)
 	structEl = cv2.getStructuringElement(cv2.MORPH_RECT, (merge,merge))
 
-	dilation = cv2.dilate(binary_img, structEl, iterations = 1)
+	dilation = cv2.dilate(binary_img, structEl, iterations = 2)
 	
 	showImage("dilate", dilation)
 
