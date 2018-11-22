@@ -3,7 +3,6 @@ import cv2
 import os
 import math
 import easygui
-from matplotlib import pyplot as plt
  
 def intCheck(string):
     try: 
@@ -291,7 +290,9 @@ def errorCheck(binaryCode):
 #shows image and hold window open
 def showImage(title, image):
 	s = np.shape(image)
-	image = cv2.resize(image, (int(s[1]*.5), int(s[0]*.5)))
+	
+	if s[0] > 1000 or s[1] > 1000:
+		image = cv2.resize(image, (int(s[1]*.5), int(s[0]*.5)))
 	
 	cv2.imshow(title, image)
 	cv2.waitKey(0)
