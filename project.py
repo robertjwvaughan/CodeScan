@@ -28,30 +28,25 @@ def barcodeCheck(img):
 def qrCodeRead(img): 
 	image_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 	height, width, _ = np.shape(img)
-	print(np.shape(img))
+	#print(np.shape(img))
 	
 	blur_k = (5,5)
-	print(blur_k)
+	#print(blur_k)
 
 	image_gray = cv2.GaussianBlur(image_gray, blur_k, 0)
-	showImage("blur", image_gray)
+	#showImage("blur", image_gray)
 
 	canny = cv2.Canny(image_gray, threshold1=255-nearestOddInteger(image_gray), threshold2=255)
 
-	showImage("canny", canny)
-	_, binary_img = cv2.threshold(canny,127,255,cv2.THRESH_BINARY)
-	
-	showImage("bin", binary_img)
-	
-	structK = (4, 4)
-
+	#showImage("canny", canny)
+		
 	merge = int((math.sqrt(width * height)) * .02)
-	print(merge)
+	#print(merge)
 	structEl = cv2.getStructuringElement(cv2.MORPH_RECT, (merge,merge))
 
-	dilation = cv2.dilate(binary_img, structEl, iterations = 2)
+	dilation = cv2.dilate(canny, structEl, iterations = 2)
 	
-	showImage("dilate", dilation)
+	#showImage("dilate", dilation)
 
 	structK = (4,4)
 	structEl = cv2.getStructuringElement(cv2.MORPH_RECT, structK)
@@ -66,13 +61,14 @@ def qrCodeRead(img):
 	x, y, width, height = cv2.boundingRect(c)
 	rotRect = cv2.minAreaRect(c)
 
-	cv2.rectangle(img,(x, y),(x + width, y + height), (0,255,0), 2)
+	imgCopy = img.copy()
+	cv2.rectangle(imgCopy,(x, y),(x + width, y + height), (0,255,0), 2)
 	
 	crop_img = img[y:y + height, x:x + width]
 	
-	showImage("cropped", crop_img)
+	#showImage("cropped", crop_img)
  
-	return crop_img, rotRect
+	return crop_img, rotRect, imgCopy
 		
 def decodeBarcode(img):	
 	#get dimensions
@@ -81,22 +77,22 @@ def decodeBarcode(img):
 	#convert to grey and threshold it
 	img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 	_, img = cv2.threshold(img, 128, 255, cv2.THRESH_BINARY)
-	showImage("img before", img)
+	#showImage("img before", img)
 	#closing image to clean up the barcode, remove numbers so they don't interfere with decoding
 	structEl = cv2.getStructuringElement(cv2.MORPH_RECT, (1, h/4))
 	morphed = cv2.morphologyEx(img, cv2.MORPH_CLOSE, structEl)
 	
 	if np.mean(morphed) > 240:
-		print(np.mean(morphed))
+		#print(np.mean(morphed))
 		structEl = cv2.getStructuringElement(cv2.MORPH_RECT, (w/4, 1))
 		morphed = cv2.morphologyEx(img, cv2.MORPH_CLOSE, structEl)
 		
-	showImage("img after", morphed)
+	#showImage("img after", morphed)
 	
 	
 	#get the binary code for each section of the barcode
 	#black bar 1 white bar 0
-	binaryCode = getBinary(morphed, h, w)
+	binaryCode, finalImg = getBinary(morphed, h, w)
 	
 
 	#convert the binary code found in to the acutal barcode numbers
@@ -107,6 +103,10 @@ def decodeBarcode(img):
 		print("CODE: " + finalCode)
 	else:
 		print("Error code not read correctly")
+		finalCode = "Could not read correctly"
+		
+	#showImage(finalCode, finalImg)
+	return finalCode
 		
 
 def findBounds(img, h , w):
@@ -192,7 +192,7 @@ def findBounds(img, h , w):
 		startX, endX, startY, endY, barWidth, img = findBounds(rotImg, h , w)
 			
 	print(startX, endX, startY, endY, barWidth)
-	showImage("bounds", img)
+	#showImage("bounds", img)
 	return startX, endX, startY, endY, barWidth, img
 	
 def getBinary(img, h, w):
@@ -215,7 +215,7 @@ def getBinary(img, h, w):
 		else:
 			binaryCode += '1'
 			
-	return binaryCode
+	return binaryCode, img
 	
 def convertBinary(binaryCode):
 	#UPC-A codes
@@ -290,6 +290,9 @@ def errorCheck(binaryCode):
  
 #shows image and hold window open
 def showImage(title, image):
+	s = np.shape(image)
+	image = cv2.resize(image, (int(s[1]*.5), int(s[0]*.5)))
+	
 	cv2.imshow(title, image)
 	cv2.waitKey(0)
 	
@@ -322,11 +325,15 @@ def main():
 	filename = easygui.fileopenbox()
 	img = cv2.imread(filename)
 
-	img, rotRect = qrCodeRead(img)
+	copy = img.copy()
+	img, rotRect, drawn = qrCodeRead(img)
 
+	finalCode = 'QR Code'
 	if barcodeCheck(img):
 		aligned = align(img, rotRect)
-		decodeBarcode(aligned)
+		finalCode = decodeBarcode(aligned)
+		
+	showImage(finalCode, drawn)
 
 
 if __name__ == "__main__":
