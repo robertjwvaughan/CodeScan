@@ -3,6 +3,7 @@ import cv2
 import os
 import math
 import easygui
+from matplotlib import pyplot as plt
  
 def intCheck(string):
     try: 
@@ -69,6 +70,7 @@ def qrCodeRead(img):
  
 	return crop_img, rotRect, imgCopy
 		
+#handles decoding barcodes
 def decodeBarcode(img):	
 	#get dimensions
 	h, w, c = np.shape(img)
@@ -76,38 +78,55 @@ def decodeBarcode(img):
 	#convert to grey and threshold it
 	img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 	_, img = cv2.threshold(img, 128, 255, cv2.THRESH_BINARY)
-	#showImage("img before", img)
+	
 	#closing image to clean up the barcode, remove numbers so they don't interfere with decoding
 	structEl = cv2.getStructuringElement(cv2.MORPH_RECT, (1, h/4))
 	morphed = cv2.morphologyEx(img, cv2.MORPH_CLOSE, structEl)
 	
+	#if previous morph left mostly white, barcode is probably rotated 90 degrees
+	#if this is the case morph using different shape structuring element
 	if np.mean(morphed) > 240:
-		#print(np.mean(morphed))
 		structEl = cv2.getStructuringElement(cv2.MORPH_RECT, (w/4, 1))
 		morphed = cv2.morphologyEx(img, cv2.MORPH_CLOSE, structEl)
 		
-	#showImage("img after", morphed)
-	
-	
 	#get the binary code for each section of the barcode
 	#black bar 1 white bar 0
 	binaryCode, finalImg = getBinary(morphed, h, w)
 	
-
 	#convert the binary code found in to the acutal barcode numbers
 	finalCode = convertBinary(binaryCode)
 
-	if finalCode is not None:		
-		#display code found
-		print("CODE: " + finalCode)
-	else:
-		print("Error code not read correctly")
+	if finalCode is None:		
 		finalCode = "Could not read correctly"
-		
-	#showImage(finalCode, finalImg)
+	
+	print("CODE: " + finalCode)	
 	return finalCode
-		
+	
+#gets a binary string from the image
+def getBinary(img, h, w):
+	#calculate the exact boundaries/characteristics of the barcode for decoding		
+	startX, endX, startY, endY, barWidth, img = findBounds(img, h, w)
 
+	binaryCode = ''
+	
+	#iterate over the barcode using above variables
+	for column in range(startX, endX, barWidth):
+		#select bar
+		line = img[startY: endY, column:column+barWidth]
+		
+		#find the avg value for the pixels in the selected bar
+		
+		avg = np.mean(line)
+
+		#if in the upper half of values binary 0, else binary 1
+		if avg > int((255/2)):
+			binaryCode += '0'
+		else:
+			binaryCode += '1'
+			
+	return binaryCode, img
+		
+#finding exact boundaries to be read
 def findBounds(img, h , w):
 	startX = 0 
 	endX = 0
@@ -115,8 +134,8 @@ def findBounds(img, h , w):
 	endY = 0
 	barWidth = 1
 	
-	#calc startx and barWidth
-	#iterating over columns finding mean values until it find one that is on avg black
+	#calculate startx and barWidth
+	#iterating over columns finding mean values until it finds one that is on avg black
 	for x in range(0,w):
 		#cut the image in single pixel wide, full height bars, across the image
 		column = img[0:h,x:x+1]
@@ -145,7 +164,7 @@ def findBounds(img, h , w):
 			endX = x
 			break
 			
-	#calc start y
+	#calc start y as above
 	for y in range(0, h):
 		row = img[y:y+1, startX:endX]
 		
@@ -153,16 +172,13 @@ def findBounds(img, h , w):
 			startY = y
 			break;
 			
-	#calc end y
+	#calc end y as above
 	for y in range(h-1, 0, -1):
 		row = img[y:y+1,startX:endX]
 	
 		if np.mean(row) < 175:
 			endY = y
 			break;
-			
-
-	c = (((endX-startX)/2,(endY-startY)/2))
 
 	#if not oriented correctly rotate 90 degress
 	if endX - startX < endY - startY:
@@ -170,7 +186,7 @@ def findBounds(img, h , w):
 		crop_img = img[startY:endY, startX:endX]
 		h, w = np.shape(crop_img)
 		
-		#create new white image to fit the cropped image so rotating doesn't lose quality
+		#create new white image to fit the cropped image so rotating doesn't lose any code
 		wh = int(math.hypot(w, -h))
 		newImg = np.zeros((wh,wh), np.uint8)
 		newImg.fill(255)
@@ -182,7 +198,7 @@ def findBounds(img, h , w):
 		
 		c = (wh/2,wh/2)
 		
-		#rotate
+		#rotate 90
 		rotMx = cv2.getRotationMatrix2D(c, 90, 1)
 		rotImg = cv2.warpAffine(newImg, rotMx, (wh,wh), borderValue = (255,255,255))
 
@@ -190,40 +206,16 @@ def findBounds(img, h , w):
 		h,w = np.shape(rotImg)
 		startX, endX, startY, endY, barWidth, img = findBounds(rotImg, h , w)
 			
-	print(startX, endX, startY, endY, barWidth)
-	#showImage("bounds", img)
 	return startX, endX, startY, endY, barWidth, img
 	
-def getBinary(img, h, w):
-	#calculate the exact boundaries/characteristics of the barcode for decoding		
-	startX, endX, startY, endY, barWidth, img = findBounds(img, h, w)
-
-	binaryCode = ''
-	
-	#iterator over the barcode using above variables
-	for column in range(startX, endX, barWidth):
-		#select bar
-		line = img[startY: endY, column:column+barWidth]
-		
-		#find the avg value for the pixels in the selected bar
-		avg = np.mean(line)
-		
-		#if in the upper half of values binary 0, else binary 1
-		if avg > int((255/2)):
-			binaryCode += '0'
-		else:
-			binaryCode += '1'
-			
-	return binaryCode, img
-	
+#converts from binary to decimal
 def convertBinary(binaryCode):
 	#UPC-A codes
 	left = ['0001101', '0011001', '0010011', '0111101', '0100011', '0110001', '0101111', '0111011', '0110111', '0001011']
 	right = ['1110010', '1100110', '1101100', '1000010', '1011100', '1001110', '1010000', '1000100', '1001000', '1110100']
 
-	
+	#if error found
 	if errorCheck(binaryCode) is not True:
-		print("Return")
 		return
 		
 	#if the guard bars are in the correct location then the following should split the left and right side 
@@ -234,6 +226,7 @@ def convertBinary(binaryCode):
 	finalLeft = convertSide(leftSide, left)
 	finalRight = convertSide(rightSide, right)
 	
+	#if converted sides are empty, code is probably upside down, so flip it
 	if finalLeft == '' or finalRight == '':
 		rightSide, leftSide = leftSide[::-1], rightSide[::-1]
 		
@@ -243,18 +236,6 @@ def convertBinary(binaryCode):
 	finalCode = finalLeft + finalRight
 	return finalCode
 	
-#converts a side of the barcode from binary to decimal using provided list
-def convertSide(side, bin):
-	final = ''
-	
-	for section in range(0,len(side)+1, 7):
-		for code in bin:
-			if side[section:section+7] == code:
-				final += str(bin.index(code))
-				break
-
-	return final
-
 #checks guard bars are in the correct place and code is correct length
 def errorCheck(binaryCode):
 	sideGuard = '101'
@@ -267,30 +248,27 @@ def errorCheck(binaryCode):
 			
 	#checking if guard bars are in the correct place, otherwise don't bother checking the rest
 	#only works for perfectly aligned and read.
-	if binaryCode[0:3] == sideGuard:
-		print("match left side guard")
+	if binaryCode[0:3] == sideGuard and binaryCode[45:50] == midGuard and  binaryCode[92:95] == sideGuard:
+		return True
 	
-		if binaryCode[45:50] == midGuard:
-			print("match mid guard")
+	return False
 	
-			if binaryCode[92:95] == sideGuard:
-				print("match right side guard")
-			else:
-				print("No match")
-				return False
-		else:
-			print("No match")
-			return False
-	else:
-		print("No match")
-		return False
-			
-	return True
+#converts a side of the barcode from binary to decimal using provided list
+def convertSide(side, bin):
+	final = ''
+	
+	for section in range(0,len(side)+1, 7):
+		for code in bin:
+			if side[section:section+7] == code:
+				final += str(bin.index(code))
+				break
+
+	return final
  
 #shows image and hold window open
 def showImage(title, image):
 	s = np.shape(image)
-	
+
 	if s[0] > 1000 or s[1] > 1000:
 		image = cv2.resize(image, (int(s[1]*.5), int(s[0]*.5)))
 	
@@ -305,7 +283,6 @@ def align(crop_img, rotRect):
 	wh = int(math.hypot(w, - h))
 	newImg = np.zeros((wh, wh, c), np.uint8)
 	newImg.fill(255)
-	
 
 	x1 = (wh-w)/2
 	y1 = (wh-h)/2
