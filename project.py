@@ -1,9 +1,7 @@
 import numpy as np
 import cv2
-import os
 import math
 import easygui
-from matplotlib import pyplot as plt
  
 def intCheck(string):
     try: 
